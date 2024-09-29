@@ -2,8 +2,31 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { NextPage } from 'next';
 import Head from 'next/head';
 import styles from '../styles/Home.module.css';
+import { useState } from 'react';
 
 const Home: NextPage = () => {
+  const [address, setAddress] = useState('');
+  const [similarWallets, setSimilarWallets] = useState<{[key: string]: number}>({});
+  const [loading, setLoading] = useState(false);
+
+  const handleCheckSimilarWallets = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/wallet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ address }),
+      });
+      const data = await response.json();
+      setSimilarWallets(data.similarWallets);
+    } catch (error) {
+      console.error('Error checking similar wallets:', error);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className={styles.container}>
       <Head>
@@ -18,16 +41,41 @@ const Home: NextPage = () => {
       <main className={styles.main}>
         <ConnectButton />
 
-        <h1 className={styles.title}>
+        {/* <h1 className={styles.title}>
           Welcome to <a href="">RainbowKit</a> + <a href="">wagmi</a> +{' '}
           <a href="https://nextjs.org">Next.js!</a>
-        </h1>
+        </h1> */}
 
         <div className={styles.grid}>
-          {/* <a className={styles.card} href="https://rainbowkit.com">
-            <h2>RainbowKit Documentation &rarr;</h2>
-            <p>Learn how to customize your wallet connection flow.</p>
-          </a> */}
+          <div className={styles.card}>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Enter Ethereum address"
+              className={styles.input}
+            />
+            <button
+              onClick={handleCheckSimilarWallets}
+              disabled={loading}
+              className={styles.button}
+            >
+              {loading ? 'Checking...' : 'Check Similar Wallets'}
+            </button>
+          </div>
+
+          {Object.keys(similarWallets).length > 0 && (
+            <div className={styles.card}>
+              <h2>Similar Wallets:</h2>
+              <ul>
+                {Object.entries(similarWallets).map(([address, count]) => (
+                  <li key={address}>
+                    {address}: {count} similar transactions
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </main>
     </div>
