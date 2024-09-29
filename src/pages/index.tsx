@@ -123,7 +123,7 @@ const Home: NextPage = () => {
         </div>
 
         <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
-          <h2>Similar Transactions</h2>
+          {compareLoading ? <h2>Similar Transactions</h2> : <h2>{similarTransactions.length} Similar Transactions</h2>}
           <p>Comparing {address} with {selectedWallet}</p>
           {compareLoading ? (
             <p>Loading comparison data...</p>
@@ -131,16 +131,26 @@ const Home: NextPage = () => {
             <ul className={styles.transactionList}>
               {similarTransactions.map((tx, index) => (
                 <li key={index} className={styles.transactionItem}>
-                  <p><strong>Time:</strong> {new Date(tx.timestamp * 1000).toISOString()}</p>
                   <p><strong>Contract:</strong> {tx.contractAddress}</p>
                   <p><strong>Method 1:</strong> {tx.wallet1Tx.input.slice(0, 10)}</p>
                   <p><strong>Method 2:</strong> {tx.wallet2Tx.input.slice(0, 10)}</p>
-                  {/* <p><strong>Value 1:</strong> {parseInt(tx.wallet1Tx.value, 16) / 1e18} ETH</p>
-                  <p><strong>Value 1:</strong> {parseInt(tx.wallet2Tx.value, 16) / 1e18} ETH</p> */}
-                  <p><strong>Value 1:</strong> {tx.wallet1Tx.value} ETH</p>
-                  <p><strong>Value 1:</strong> {tx.wallet2Tx.value} ETH</p>
-                  <p><strong>Wallet 1 Tx:</strong> {tx.wallet1Tx.hash}</p>
-                  <p><strong>Wallet 2 Tx:</strong> {tx.wallet2Tx.hash}</p>
+                  <p><strong>Value 1:</strong> {parseInt(tx.wallet1Tx.value, 10) / 1e18} ETH</p>
+                  <p><strong>Value 1:</strong> {parseInt(tx.wallet2Tx.value, 10) / 1e18} ETH</p>
+                  <p>
+                    <strong>Wallet 1 Tx: </strong> 
+                    <a href={`https://scrollscan.com/tx/${tx.wallet1Tx.hash}`} target="_blank" rel="noopener noreferrer">
+                      {`https://scrollscan.com/tx/${tx.wallet1Tx.hash}`}
+                    </a>
+                  </p>
+                  <p>
+                    <strong>Wallet 2 Tx: </strong> 
+                    <a href={`https://scrollscan.com/tx/${tx.wallet2Tx.hash}`} target="_blank" rel="noopener noreferrer">
+                      {`https://scrollscan.com/tx/${tx.wallet2Tx.hash}`}
+                    </a>
+                  </p>
+                  <p><strong>Time 1:</strong> {new Date(parseInt(tx.wallet1Tx.timeStamp) * 1000).toLocaleString()}</p>
+                  <p><strong>Time 2:</strong> {new Date(parseInt(tx.wallet2Tx.timeStamp) * 1000).toLocaleString()}</p>
+                  <p><strong>Time difference:</strong> {Math.abs(parseInt(tx.wallet1Tx.timeStamp) - parseInt(tx.wallet2Tx.timeStamp))} seconds</p>
                 </li>
               ))}
             </ul>

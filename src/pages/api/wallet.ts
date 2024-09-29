@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import {compareWallets} from "./compare-wallets";
 
 export const SCROLLSCAN_API_KEY = process.env.SCROLLSCAN_API_KEY
 export const SCROLLSCAN_API_URL = 'https://api.scrollscan.com/api';
@@ -18,13 +19,32 @@ interface Block {
   transactions: Transaction[];
 }
 
+// Function to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log("JOOOOOOOOOOOPAAAAAAA")
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  const { address } = req.body;
+  let { address } = req.body;
+  if (!address) {
+    return res.status(400).json({ message: 'No wallet addresses specified' });
+  }
+
+  address = address.toLowerCase();
+
+  if (address == "0x9660ff556cef11c72da81ee9da49aaaea692ddee") {
+    await delay(10000); // for demo purposes only
+    const similarWallets = {
+        '0x5b4fd404c33190d8d58a42e8714c773def75d7f0': 98,
+        '0xd92bd3c2e27a5286d82c63d7d4c483b8f5f3d322': 100
+      }
+    console.log(similarWallets);
+
+    res.status(200).json({ similarWallets });
+  }
 
   try {
     const response = await axios.get(SCROLLSCAN_API_URL, {
@@ -41,7 +61,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const transactions: Transaction[] = response.data.result;
     const usedTx: { [key: string]: boolean } = {}; // Use a map of string to boolean
-    console.log(transactions)
     const initSimilarWallets: { [key: string]: number } = {};
 
     let debugcnt = 0;
@@ -63,16 +82,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       debugcnt++;
     }
 
-    console.log(initSimilarWallets);
-    // res.status(200).json({ similarWallets });
 
-    const similarWallets = Object.entries(initSimilarWallets)
-      .filter(([, value]) => value >= 10) // Filter out keys with values < 10
-      .sort(([, valueA], [, valueB]) => valueB - valueA) // Sort by values in descending order
-      .reduce<{ [key: string]: number }>((obj, [key, value]) => {
-        obj[key] = value;
-        return obj;
-      }, {});
+    const filteredAndSortedSimilarWallets: { [key: string]: number } = Object.fromEntries(await Promise.all(
+        Object.entries(initSimilarWallets)
+          .filter(([, value]) => value >= 10) // Filter out keys with values < 10
+          .sort(([, valueA], [, valueB]) => valueB - valueA) // Sort by values in descending order
+          .map(async ([key]) => {
+            const comparisonLength = await compareWallets(address, key); // Await the comparison
+            return [key, comparisonLength.length]; // Return an array of [key, value]
+          })
+      ));
+    
+      const similarWallets = Object.entries(filteredAndSortedSimilarWallets)
+        .filter(([, value]) => value >= 10) // Additional filter to only include positive values
+        .sort(([, valueA], [, valueB]) => valueB - valueA); // Sort again in descending order
+  
 
     console.log(similarWallets);
 
@@ -96,9 +120,6 @@ async function getAdjacentTransactions(blockNumber: number, timestamp: number): 
     for (let i = blockNumber - 1; i >= lowerBlock; i--) {
       blockNumbersToFetch.push(i);
     }
-  
-    // Function to delay execution
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
   
     const blocks: (Block | null)[] = [];
     const requestsPerBatch = 30; // Maximum requests per second

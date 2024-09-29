@@ -26,20 +26,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  const { wallet1, wallet2 } = req.body;
+  let { wallet1, wallet2 } = req.body;
 
   if (!wallet1 || !wallet2) {
     return res.status(400).json({ message: 'Both wallet addresses are required' });
   }
 
-  try {
-    const wallet1Txs = await getAddressTransactions(wallet1);
-    console.log("wallet1Txs:", wallet1Txs.length)
-    const wallet2Txs = await getAddressTransactions(wallet2);
-    console.log("wallet2Txs:", wallet2Txs.length)
 
-    const similarTransactions = findSimilarTransactions(wallet1Txs, wallet2Txs);
-    console.log("similarTxs:", similarTransactions.length);
+  try {
+    const similarTransactions = await compareWallets(wallet1, wallet2);
 
     res.status(200).json({ similarTransactions });
   } catch (error) {
@@ -48,22 +43,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export async function compareWallets(wallet1: string, wallet2: string): Promise<SimilarTransaction[]> {
+    wallet1 = wallet1.toLowerCase();
+    wallet2 = wallet2.toLowerCase();
+
+    const wallet1Txs = await getAddressTransactions(wallet1);
+    const wallet2Txs = await getAddressTransactions(wallet2);
+
+    const similarTransactions = findSimilarTransactions(wallet1Txs, wallet2Txs);
+
+    console.log("comparing:", wallet1, "and", wallet2, "wallet1Txs:", wallet1Txs.length, "wallet2Txs:", wallet2Txs.length, "similarTxs:", similarTransactions.length);
+    
+    return similarTransactions;
+}
+
+let lastRequestTime = 0; // Store the time of the last request
+const requestDelay = 1000; // 1 second in milliseconds
+
 async function getAddressTransactions(address: string): Promise<Transaction[]> {
+    const currentTime = Date.now();
+
+    // Calculate the time since the last request
+    const timeSinceLastRequest = currentTime - lastRequestTime;
+
+    // If the time since the last request is less than the delay, wait
+    if (timeSinceLastRequest < requestDelay) {
+        await new Promise(resolve => setTimeout(resolve, requestDelay - timeSinceLastRequest));
+    }
+
+    // Now we can make the request
     const response = await axios.get(SCROLLSCAN_API_URL, {
         params: {
-        module: 'account',
-        action: 'txlist',
-        address,
-        startblock: 0,
-        endblock: 99999999,
-        sort: 'asc',
-        apikey: SCROLLSCAN_API_KEY,
+            module: 'account',
+            action: 'txlist',
+            address,
+            startblock: 0,
+            endblock: 99999999,
+            sort: 'asc',
+            apikey: SCROLLSCAN_API_KEY,
         },
     });
 
     const transactions: Transaction[] = response.data.result;
+
+    // Update the last request time to now
+    lastRequestTime = Date.now();
+
     return transactions;
 }
+
 
 function findSimilarTransactions(wallet1Txs: Transaction[], wallet2Txs: Transaction[]): SimilarTransaction[] {
   const similarTxs: SimilarTransaction[] = [];
@@ -74,13 +102,13 @@ function findSimilarTransactions(wallet1Txs: Transaction[], wallet2Txs: Transact
       if (
         tx1.to === tx2.to &&
         !usedTx[tx2.hash] &&
-        Math.abs(parseInt(tx1.timeStamp, 16) - parseInt(tx2.timeStamp, 16)) <= 60 // Within 1 minute
+        Math.abs(parseInt(tx1.timeStamp) - parseInt(tx2.timeStamp)) <= 60 // Within 1 minute
       ) {
         similarTxs.push({
           wallet1Tx: tx1,
           wallet2Tx: tx2,
           contractAddress: tx1.to,
-          timestamp: parseInt(tx1.timeStamp, 16),
+          timestamp: parseInt(tx1.timeStamp),
           value: tx1.value,
           methodSignature: tx1.input.slice(0, 10) // First 4 bytes of the input data
         });
@@ -91,20 +119,4 @@ function findSimilarTransactions(wallet1Txs: Transaction[], wallet2Txs: Transact
   }
 
   return similarTxs.sort((a, b) => a.timestamp - b.timestamp);
-}
-
-function formatTransaction(tx: SimilarTransaction): string {
-  const date = new Date(tx.timestamp * 1000).toISOString();
-  const valueInEther1 = parseInt(tx.wallet1Tx.value, 16) / 1e26;
-  const valueInEther2 = parseInt(tx.wallet2Tx.value, 16) / 1e26;
-  return `
-    Time: ${date}
-    Contract: ${tx.contractAddress}
-    Method 1: ${tx.wallet1Tx.input.slice(0, 10)}
-    Method 2: ${tx.wallet2Tx.input.slice(0, 10)}
-    Value 1: ${valueInEther1} ETH
-    Value 2: ${valueInEther2} ETH
-    Wallet 1 Tx: ${tx.wallet1Tx.hash}
-    Wallet 2 Tx: ${tx.wallet2Tx.hash}
-  `;
 }
