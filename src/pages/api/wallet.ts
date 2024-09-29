@@ -19,6 +19,7 @@ interface Block {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log("JOOOOOOOOOOOPAAAAAAA")
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
@@ -39,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const transactions: Transaction[] = response.data.result;
+    console.log(transactions)
     const similarWallets: { [key: string]: number } = {};
 
     for (const tx of transactions) {
@@ -46,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const timestamp = parseInt(tx.timeStamp);
 
       const adjacentTransactions = await getAdjacentTransactions(blockNumber, timestamp);
+      console.log("NEW:", blockNumber, adjacentTransactions.length);
 
       for (const adjTx of adjacentTransactions) {
         if (adjTx.to === tx.to && adjTx.from !== address) {
@@ -54,7 +57,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    res.status(200).json({ similarWallets });
+    const sortedAndFilteredSimilarWallets = Object.entries(similarWallets)
+      .filter(([, value]) => value >= 10) // Filter out keys with values < 10
+      .sort(([, valueA], [, valueB]) => valueB - valueA) // Sort by values in descending order
+      .reduce<{ [key: string]: number }>((obj, [key, value]) => {
+        obj[key] = value;
+        return obj;
+      }, {});
+
+    res.status(200).json({ sortedAndFilteredSimilarWallets });
   } catch (error) {
     console.error('Error processing request:', error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -66,12 +77,22 @@ async function getAdjacentTransactions(blockNumber: number, timestamp: number): 
     const upperBlock = blockNumber + 10;
     const adjacentTransactions: Transaction[] = [];
   
-    for (let i = lowerBlock; i <= upperBlock; i++) {
+    for (let i = blockNumber; ; i++) {
       const block = await getBlockByNumber(i);
-      if (Math.abs(parseInt(block.timestamp, 16) - timestamp) <= 120) { // Within 2 minutes
+      if (Math.abs(parseInt(block.timestamp, 16) - timestamp) <= 60) { // Within 1 minute
         adjacentTransactions.push(...block.transactions);
+      } else {
+        break;
       }
     }
+    for (let i = blockNumber - 1; i >= 0; i--) {
+        const block = await getBlockByNumber(i);
+        if (Math.abs(parseInt(block.timestamp, 16) - timestamp) <= 60) { // Within 1 minute
+          adjacentTransactions.push(...block.transactions);
+        } else {
+            break;
+        }
+      }
   
     return adjacentTransactions;
   }
