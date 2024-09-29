@@ -2,12 +2,42 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { NextPage } from 'next';
 import Head from 'next/head';
 import styles from '../styles/Home.module.css';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import {Transaction, SimilarTransaction} from "./api/compare-wallets";
+
+const Modal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}> = ({ isOpen, onClose, children }) => {
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+        <button className={styles.closeButton} onClick={onClose}>&times;</button>
+        {children}
+      </div>
+    </div>
+  );
+};
 
 const Home: NextPage = () => {
   const [address, setAddress] = useState('');
   const [similarWallets, setSimilarWallets] = useState<{[key: string]: number}>({});
   const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState('');
+  const [similarTransactions, setSimilarTransactions] = useState<SimilarTransaction[]>([]);
+  const [compareLoading, setCompareLoading] = useState(false);
 
   const handleCheckSimilarWallets = async () => {
     setLoading(true);
@@ -27,6 +57,26 @@ const Home: NextPage = () => {
     setLoading(false);
   };
 
+  const handleCompareWallets = async (similarWalletAddress: string) => {
+    setSelectedWallet(similarWalletAddress);
+    setModalOpen(true);
+    setCompareLoading(true);
+    try {
+      const response = await fetch('/api/compare-wallets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ wallet1: address, wallet2: similarWalletAddress }),
+      });
+      const data = await response.json();
+      setSimilarTransactions(data.similarTransactions);
+    } catch (error) {
+      console.error('Error comparing wallets:', error);
+    }
+    setCompareLoading(false);
+  };
+
   return (
     <div className={styles.container}>
       <Head>
@@ -40,11 +90,6 @@ const Home: NextPage = () => {
 
       <main className={styles.main}>
         <ConnectButton />
-
-        {/* <h1 className={styles.title}>
-          Welcome to <a href="">RainbowKit</a> + <a href="">wagmi</a> +{' '}
-          <a href="https://nextjs.org">Next.js!</a>
-        </h1> */}
 
         <div className={styles.grid}>
           <div className={styles.card}>
@@ -63,11 +108,11 @@ const Home: NextPage = () => {
               {loading ? 'Checking...' : 'Check Similar Wallets'}
             </button>
           </div>
-
-          {Object.keys(similarWallets).length > 0 && (
+          {loading ? (<p>Loading similar wallets...</p>) : 
+          Object.keys(similarWallets).length > 0 && (
             <div className={styles.grid}>
               {Object.entries(similarWallets).map(([walletAddress, count]) => (
-                <div key={walletAddress} className={styles.card}>
+                <div key={walletAddress} className={styles.card} onClick={() => handleCompareWallets(walletAddress)}>
                   <h3>Wallet Address:</h3>
                   <p>{walletAddress}</p>
                   <p>Similar Transactions: {count}</p>
@@ -77,6 +122,32 @@ const Home: NextPage = () => {
           )}
         </div>
 
+        <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
+          <h2>Similar Transactions</h2>
+          <p>Comparing {address} with {selectedWallet}</p>
+          {compareLoading ? (
+            <p>Loading comparison data...</p>
+          ) : similarTransactions.length > 0 ? (
+            <ul className={styles.transactionList}>
+              {similarTransactions.map((tx, index) => (
+                <li key={index} className={styles.transactionItem}>
+                  <p><strong>Time:</strong> {new Date(tx.timestamp * 1000).toISOString()}</p>
+                  <p><strong>Contract:</strong> {tx.contractAddress}</p>
+                  <p><strong>Method 1:</strong> {tx.wallet1Tx.input.slice(0, 10)}</p>
+                  <p><strong>Method 2:</strong> {tx.wallet2Tx.input.slice(0, 10)}</p>
+                  {/* <p><strong>Value 1:</strong> {parseInt(tx.wallet1Tx.value, 16) / 1e18} ETH</p>
+                  <p><strong>Value 1:</strong> {parseInt(tx.wallet2Tx.value, 16) / 1e18} ETH</p> */}
+                  <p><strong>Value 1:</strong> {tx.wallet1Tx.value} ETH</p>
+                  <p><strong>Value 1:</strong> {tx.wallet2Tx.value} ETH</p>
+                  <p><strong>Wallet 1 Tx:</strong> {tx.wallet1Tx.hash}</p>
+                  <p><strong>Wallet 2 Tx:</strong> {tx.wallet2Tx.hash}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No similar transactions found.</p>
+          )}
+        </Modal>
       </main>
     </div>
   );

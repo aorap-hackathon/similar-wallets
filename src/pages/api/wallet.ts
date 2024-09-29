@@ -1,9 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
-const SCROLLSCAN_API_KEY = process.env.SCROLLSCAN_API_KEY
-const SCROLLSCAN_API_URL = 'https://api.scrollscan.com/api';
-const ALCHEMY_API_URL = `https://scroll-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
+export const SCROLLSCAN_API_KEY = process.env.SCROLLSCAN_API_KEY
+export const SCROLLSCAN_API_URL = 'https://api.scrollscan.com/api';
+export const ALCHEMY_API_URL = `https://scroll-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
 
 interface Transaction {
   blockNumber: string;
@@ -40,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const transactions: Transaction[] = response.data.result;
+    const usedTx: { [key: string]: boolean } = {}; // Use a map of string to boolean
     console.log(transactions)
     const initSimilarWallets: { [key: string]: number } = {};
 
@@ -52,8 +53,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log("Block number:", blockNumber, "transactions length:", adjacentTransactions.length);
 
       for (const adjTx of adjacentTransactions) {
-        if (adjTx.to === tx.to && adjTx.from !== address) {
+        if (adjTx.to === tx.to && adjTx.from !== address && !usedTx[adjTx.hash]) {
             initSimilarWallets[adjTx.from] = (initSimilarWallets[adjTx.from] || 0) + 1;
+            usedTx[adjTx.hash] = true;
+            break;
         }
       }
 
@@ -81,8 +84,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 
 async function getAdjacentTransactions(blockNumber: number, timestamp: number): Promise<Transaction[]> {
-    const lowerBlock = Math.max(0, blockNumber - 20);
-    const upperBlock = blockNumber + 20;
+    const lowerBlock = Math.max(0, blockNumber - 30);
+    const upperBlock = blockNumber + 30;
   
     const blockNumbersToFetch = [];
   
@@ -98,7 +101,7 @@ async function getAdjacentTransactions(blockNumber: number, timestamp: number): 
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
   
     const blocks: (Block | null)[] = [];
-    const requestsPerBatch = 20; // Maximum requests per second
+    const requestsPerBatch = 30; // Maximum requests per second
     const delayPerRequest = 1000 / requestsPerBatch; // Delay between requests in ms
   
     // Fetch blocks in batches
