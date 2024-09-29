@@ -60,7 +60,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-direction: column; /* Change from row to column */
   max-width: 800px;
 }
 

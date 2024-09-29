@@ -65,18 +65,18 @@ const Home: NextPage = () => {
           </div>
 
           {Object.keys(similarWallets).length > 0 && (
-            <div className={styles.card}>
-              <h2>Similar Wallets:</h2>
-              <ul>
-                {Object.entries(similarWallets).map(([address, count]) => (
-                  <li key={address}>
-                    {address}: {count} similar transactions
-                  </li>
-                ))}
-              </ul>
+            <div className={styles.grid}>
+              {Object.entries(similarWallets).map(([walletAddress, count]) => (
+                <div key={walletAddress} className={styles.card}>
+                  <h3>Wallet Address:</h3>
+                  <p>{walletAddress}</p>
+                  <p>Similar Transactions: {count}</p>
+                </div>
+              ))}
             </div>
           )}
         </div>
+
       </main>
     </div>
   );
