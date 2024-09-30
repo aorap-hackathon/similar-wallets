@@ -44,6 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(similarWallets);
 
     res.status(200).json({ similarWallets });
+    return;
   }
 
   console.log("JOOOOOOOOOOOPAAAAAAA")

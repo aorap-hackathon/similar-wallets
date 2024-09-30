@@ -75,16 +75,27 @@ const Home: NextPage = () => {
     checkMintStatus();
   }, [address]);
 
-  const handleCheckSimilarWallets = async () => {
+  const handleCheckSimilarWallets = async (nextAddress: any) => {
     setLoading(true);
     try {
-      const response = await fetch('/api/wallet', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ address: inputAddress }),
-      });
+      let response;
+      if (typeof nextAddress === 'string') {
+        response = await fetch('/api/wallet', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ address: nextAddress }),
+        });
+      } else {
+        response = await fetch('/api/wallet', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ address: inputAddress }),
+        });
+      }
       const data = await response.json();
       setSimilarWallets(data.similarWallets);
       setSignature(data.signature || '');
@@ -95,8 +106,9 @@ const Home: NextPage = () => {
   };
 
   const handleCheckSimilarWalletsForAccount = async() => {
+    if (!address) return;
     setInputAddress(address as string);
-    await handleCheckSimilarWallets();
+    await handleCheckSimilarWallets(address);
   }
 
   const handleCompareWallets = async (similarWalletAddress: string) => {
@@ -109,7 +121,7 @@ const Home: NextPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ wallet1: address, wallet2: similarWalletAddress }),
+        body: JSON.stringify({ wallet1: inputAddress, wallet2: similarWalletAddress }),
       });
       const data = await response.json();
       setSimilarTransactions(data.similarTransactions);
@@ -194,17 +206,20 @@ const Home: NextPage = () => {
           ) : (
             signature ? (
               <div className={styles.card}>
-                <p>No similar wallets found. You can mint an NFT!</p>
+                <p>No similar wallets found.</p>
                 {hasMinted ? (
                   <p>You have already minted an NFT.</p>
                 ) : (
-                  <button onClick={handleMintNFT} className={styles.button}>
-                    Mint NFT
-                  </button>
+                  <div>
+                    <p>You can mint an NFT that shows the uniqueness of your wallet!</p>
+                    <button onClick={handleMintNFT} className={styles.button}>
+                      Mint NFT
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (
-              <p>Great! No similar wallets found.</p>
+              <p>Let's check your similar wallets in Scroll network!</p>
           ))}
         </div>
 
