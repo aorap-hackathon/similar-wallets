@@ -47,8 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  console.log("JOOOOOOOOOOOPAAAAAAA")
-
   try {
     const response = await axios.get(SCROLLSCAN_API_URL, {
       params: {
