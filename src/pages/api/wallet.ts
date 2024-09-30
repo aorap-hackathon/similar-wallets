@@ -23,7 +23,6 @@ interface Block {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log("JOOOOOOOOOOOPAAAAAAA")
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
@@ -46,6 +45,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({ similarWallets });
   }
 
+  console.log("JOOOOOOOOOOOPAAAAAAA")
+
   try {
     const response = await axios.get(SCROLLSCAN_API_URL, {
       params: {
@@ -64,12 +65,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const initSimilarWallets: { [key: string]: number } = {};
 
     let debugcnt = 0;
+    console.log("Found", transactions.length, "transactions");
     for (const tx of transactions) {
       const blockNumber = parseInt(tx.blockNumber);
       const timestamp = parseInt(tx.timeStamp);
 
       const adjacentTransactions = await getAdjacentTransactions(blockNumber, timestamp);
-      console.log("Block number:", blockNumber, "transactions length:", adjacentTransactions.length);
+      console.log(`Block number: ${blockNumber}, transaction ${debugcnt+1}/${transactions.length}, transactions length ${adjacentTransactions.length}`);
 
       for (const adjTx of adjacentTransactions) {
         if (adjTx.to === tx.to && adjTx.from !== address && !usedTx[adjTx.hash]) {
@@ -93,9 +95,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })
       ));
     
-      const similarWallets = Object.entries(filteredAndSortedSimilarWallets)
+      const similarWallets = Object.fromEntries(Object.entries(filteredAndSortedSimilarWallets)
         .filter(([, value]) => value >= 10) // Additional filter to only include positive values
-        .sort(([, valueA], [, valueB]) => valueB - valueA); // Sort again in descending order
+        .sort(([, valueA], [, valueB]) => valueB - valueA)); // Sort again in descending order
   
 
     console.log(similarWallets);

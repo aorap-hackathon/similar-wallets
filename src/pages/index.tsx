@@ -4,6 +4,7 @@ import Head from 'next/head';
 import styles from '../styles/Home.module.css';
 import { useState, useEffect } from 'react';
 import {Transaction, SimilarTransaction} from "./api/compare-wallets";
+import { useAccount } from 'wagmi';
 
 const Modal: React.FC<{
   isOpen: boolean;
@@ -31,13 +32,15 @@ const Modal: React.FC<{
 };
 
 const Home: NextPage = () => {
-  const [address, setAddress] = useState('');
+  const [inputAddress, setInputAddress] = useState('');
   const [similarWallets, setSimilarWallets] = useState<{[key: string]: number}>({});
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState('');
   const [similarTransactions, setSimilarTransactions] = useState<SimilarTransaction[]>([]);
   const [compareLoading, setCompareLoading] = useState(false);
+  
+  const { address } = useAccount();
 
   const handleCheckSimilarWallets = async () => {
     setLoading(true);
@@ -47,7 +50,7 @@ const Home: NextPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ address: inputAddress }),
       });
       const data = await response.json();
       setSimilarWallets(data.similarWallets);
@@ -56,6 +59,11 @@ const Home: NextPage = () => {
     }
     setLoading(false);
   };
+
+  const handleCheckSimilarWalletsForAccount = async() => {
+    setInputAddress(address as string);
+    await handleCheckSimilarWallets();
+  }
 
   const handleCompareWallets = async (similarWalletAddress: string) => {
     setSelectedWallet(similarWalletAddress);
@@ -77,6 +85,7 @@ const Home: NextPage = () => {
     setCompareLoading(false);
   };
 
+
   return (
     <div className={styles.container}>
       <Head>
@@ -92,11 +101,20 @@ const Home: NextPage = () => {
         <ConnectButton />
 
         <div className={styles.grid}>
+        <div className={styles.card}>
+            <button
+              onClick={handleCheckSimilarWalletsForAccount}
+              disabled={loading}
+              className={styles.button}
+            >
+              {loading ? 'Checking...' : 'Check Similar Wallets for my account!'}
+            </button>
+          </div>
           <div className={styles.card}>
             <input
               type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              value={inputAddress}
+              onChange={(e) => setInputAddress(e.target.value)}
               placeholder="Enter Ethereum address"
               className={styles.input}
             />
@@ -109,7 +127,7 @@ const Home: NextPage = () => {
             </button>
           </div>
           {loading ? (<p>Loading similar wallets...</p>) : 
-          Object.keys(similarWallets).length > 0 && (
+          similarWallets && Object.keys(similarWallets).length > 0 ? (
             <div className={styles.grid}>
               {Object.entries(similarWallets).map(([walletAddress, count]) => (
                 <div key={walletAddress} className={styles.card} onClick={() => handleCompareWallets(walletAddress)}>
@@ -119,12 +137,14 @@ const Home: NextPage = () => {
                 </div>
               ))}
             </div>
+          ) : (
+            <p>Great! No similar wallets found.</p>
           )}
         </div>
 
         <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
           {compareLoading ? <h2>Similar Transactions</h2> : <h2>{similarTransactions.length} Similar Transactions</h2>}
-          <p>Comparing {address} with {selectedWallet}</p>
+          <p>Comparing {inputAddress} with {selectedWallet}</p>
           {compareLoading ? (
             <p>Loading comparison data...</p>
           ) : similarTransactions.length > 0 ? (
