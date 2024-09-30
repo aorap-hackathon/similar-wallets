@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import {compareWallets} from "./compare-wallets";
+import { ethers } from 'ethers';
 
 export const SCROLLSCAN_API_KEY = process.env.SCROLLSCAN_API_KEY
 export const SCROLLSCAN_API_URL = 'https://api.scrollscan.com/api';
@@ -102,12 +103,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(similarWallets);
 
-    res.status(200).json({ similarWallets });
+    if (Object.keys(similarWallets).length === 0) {
+        // No similar wallets found, generate signature
+        const signature = await generateSignature(address);
+        res.status(200).json({ similarWallets, signature });
+      } else {
+        res.status(200).json({ similarWallets });
+      }
   } catch (error) {
     console.error('Error processing request:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 }
+
+// async function generateSignature(address: string): Promise<string> {
+//     console.log("address:", address)
+//     const wallet = new ethers.Wallet(process.env.PRIVATE_KEY as string);
+//     const messageHash = keccak256(toUtf8Bytes(address));
+//     const messageHashBinary = getBytes(messageHash);
+//     const signature = await wallet.signMessage(messageHashBinary);
+//     console.log('signature:', signature);
+//     return signature;
+// }
+
+async function generateSignature(address: string): Promise<string> {
+  console.log("ADDRESS:", address);
+  const messageHash = ethers.solidityPackedKeccak256(["address"], [address]);
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY as string);
+  const signature = await wallet.signMessage(ethers.getBytes(messageHash));
+
+  const recoveredAddress = ethers.verifyMessage(ethers.getBytes(messageHash), signature);
+  console.log("recoveredAddress:", recoveredAddress)
+
+  return signature;
+}
+
+// 0x641bbc3c272fa5a40546746252599426dc6227820933674c970121854adbb44f12bd2f960e8da7bcb3c9705f6ae02908eb8ce4d814f94efe1f8804e5c53d13c51c - from scrollscan
+
+// 0x556bb1e66a25d50bd1b93cb8e24911ff013ea7f6203f5edb96b385b9473fa6b83638093c0ffa8cb2d25e1a1cfd5b3e464536a99cceabc6cc57ad571dc3446a411b - from here
 
 async function getAdjacentTransactions(blockNumber: number, timestamp: number): Promise<Transaction[]> {
     const lowerBlock = Math.max(0, blockNumber - 30);

@@ -4,6 +4,7 @@ const nextConfig = {
   env: {
     ALCHEMY_API_KEY: process.env.ALCHEMY_API_KEY,
     SCROLLSCAN_API_KEY: process.env.SCROLLSCAN_API_KEY,
+    PRIVATE_KEY: process.env.PRIVATE_KEY,
   }
 };
 

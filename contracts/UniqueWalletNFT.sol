@@ -24,14 +24,11 @@ contract UniqueWalletNFT is ERC721, Ownable {
         signerAddress = msg.sender;
     }
 
-    function mintNFT(address recipient, bytes memory signature) public {
+    function mintNFT(bytes memory signature) public {
+        address recipient = msg.sender;
         require(!hasMinted[recipient], "Address has already minted an NFT");
-        
-        bytes32 messageHash = keccak256(abi.encodePacked(recipient));
 
-        address recoveredSigner = ECDSA.recover(MessageHashUtils.toEthSignedMessageHash(messageHash), signature);
-        
-        require(recoveredSigner == signerAddress, "Invalid signature");
+        require(recoverSigner(recipient, signature) == signerAddress, "Invalid signature");
 
         _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
@@ -43,4 +40,12 @@ contract UniqueWalletNFT is ERC721, Ownable {
     function setSignerAddress(address _signerAddress) public onlyOwner {
         signerAddress = _signerAddress;
     }
+
+    function recoverSigner(address recipient, bytes memory signature) public pure returns (address) {
+        bytes32 messageHash = keccak256(abi.encodePacked(recipient));
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+
+        return ECDSA.recover(ethSignedMessageHash, signature);
+    }
+
 }
